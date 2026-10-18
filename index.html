@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Inner Speech Receptor (Prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg: #0a1120; --panel: #0f1a2e; --panel-2: #0c1526; --line: #1c2a44;
+  --text: #e6ecf5; --muted: #8c9bb5; --accent: #4f8cff; --radius: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.5 Inter, "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif; }
+h2, h3, p { margin: 0; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+
+/* Top bar */
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 28px; border-bottom: 1px solid var(--line); background: #0b1324; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.brand p { color: var(--muted); font-size: 13px; }
+.logo { display: flex; align-items: center; gap: 3px; height: 32px; }
+.logo span { width: 4px; border-radius: 2px; background: var(--accent); }
+.topbar-right { display: flex; align-items: center; gap: 20px; font-size: 13px; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: #111c33; border: 1px solid var(--line); }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #475569; }
+.pill.on { color: var(--text); }
+.pill.on .dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+
+/* Layout */
+.layout { display: grid; grid-template-columns: 230px minmax(0, 1fr) 360px; min-height: calc(100vh - 69px); }
+.sidebar { display: flex; flex-direction: column; gap: 4px; padding: 20px 14px; border-right: 1px solid var(--line); background: #0b1324; }
+.sidebar a { color: var(--muted); text-decoration: none; padding: 12px 16px; border-radius: 10px; transition: .15s; }
+.sidebar a:hover { background: #121f38; color: var(--text); }
+.sidebar a.active { background: #16274a; color: #fff; }
+.sidebar-foot { margin-top: auto; padding: 16px; display: flex; flex-direction: column; font-size: 13px; color: var(--muted); }
+.sidebar-foot strong { color: var(--text); font-weight: 500; }
+.main { padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px; }
+.timeline { border-left: 1px solid var(--line); padding: 24px 20px; }
+
+/* Cards */
+.card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+.card-head { margin-bottom: 18px; }
+.card-head h3 { font-size: 17px; font-weight: 600; }
+.card-head p { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.card-label { color: #7fb0ff; margin-bottom: 10px; }
+.title { font-size: 28px; font-weight: 600; }
+.subtitle { color: var(--muted); margin-top: 4px; }
+.hero { display: grid; grid-template-columns: 2fr 1fr 1fr; }
+.hero > div { padding: 0 22px; }
+.hero > div + div { border-left: 1px solid var(--line); }
+.hero h3 { font-size: 24px; font-weight: 500; margin-bottom: 8px; }
+.quote { color: #c6d0e0; }
+.big { font-size: 26px; font-weight: 500; margin-bottom: 4px; }
+.ibar { display: flex; gap: 4px; margin-top: 10px; max-width: 160px; }
+.ibar span { flex: 1; height: 8px; border-radius: 4px; background: #1e2a44; }
+.ibar span.on { background: var(--c); }
+.tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+.chip { font-size: 12px; color: var(--muted); padding: 3px 10px; border-radius: 999px; background: #16223a; }
+
+/* Spectrum + mic */
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 20px; }
+.spectrum { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 24px; align-items: center; }
+.sbar { display: grid; grid-template-columns: 90px 1fr 44px; align-items: center; gap: 12px; padding: 5px 0; font-size: 14px; }
+.track { height: 8px; border-radius: 4px; background: #1a2640; overflow: hidden; }
+.fill { height: 100%; border-radius: 4px; transition: width .4s; }
+.pct { text-align: right; color: var(--muted); font-size: 13px; }
+.ring { width: 180px; }
+.ring-bg { fill: none; stroke: #1a2640; stroke-width: 12; }
+.ring-fg { fill: none; stroke: var(--c); stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray .5s; }
+.ring text { text-anchor: middle; fill: var(--text); }
+.ring .ring-sm { font-size: 13px; fill: var(--muted); }
+.ring .ring-lg { font-size: 22px; font-weight: 600; }
+.ring .ring-lvl { font-size: 13px; fill: var(--c); }
+.mic-card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; }
+.mic-btn { width: 96px; height: 96px; border-radius: 50%; border: 3px solid #334155; background: #121d33; color: #94a3b8; cursor: pointer; display: grid; place-items: center; transition: .2s; margin-bottom: 8px; }
+.mic-btn.on { border-color: #ff4d6d; background: #4a1626; color: #fff; box-shadow: 0 0 0 8px rgba(255,77,109,.08), 0 0 24px rgba(255,77,109,.35); }
+.mic-state { font-weight: 600; color: var(--muted); }
+.mic-btn.on ~ .mic-state { color: #ff4d6d; }
+.interim { min-height: 20px; font-size: 12.5px; color: var(--muted); font-style: italic; max-width: 200px; }
+
+/* Manual test input */
+.test-input { display: flex; gap: 10px; }
+.test-input input { flex: 1; }
+
+/* Buttons & forms */
+.btn { font: inherit; font-size: 14px; color: var(--text); background: #1a2b4d; border: 1px solid #23375e; padding: 9px 18px; border-radius: 999px; cursor: pointer; }
+.btn:hover { background: #213762; }
+.btn.ghost { background: transparent; border-color: var(--line); color: #a9c4ff; }
+.btn.subtle { background: transparent; border-color: #3a2533; color: #f0a8b8; }
+.form { display: flex; flex-direction: column; gap: 18px; max-width: 520px; }
+.form label { display: flex; flex-direction: column; gap: 6px; }
+.form label.check { flex-direction: row; align-items: center; gap: 10px; }
+.form small { color: var(--muted); }
+input[type=text], select { font: inherit; color: var(--text); background: #0b1324; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td, th { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+.sep { color: #334155; margin: 0 6px; }
+.link { color: #7fb0ff; text-decoration: none; display: block; text-align: center; margin-top: 16px; }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: 12px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+
+/* Emotion path */
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; margin: 10px 0; }
+.path .step { color: var(--c); display: inline-flex; align-items: center; gap: 5px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: inline-block; }
+.arrow { color: var(--muted); }
+.meta { color: var(--muted); font-size: 13.5px; display: flex; flex-direction: column; gap: 4px; margin: 8px 0 12px; }
+
+/* Timeline */
+.tl-head { margin-bottom: 18px; }
+.tl-head h3 { font-size: 18px; font-weight: 600; }
+.tl-head p { color: var(--muted); font-size: 13px; }
+.tl-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+.tl-top { display: flex; justify-content: space-between; align-items: center; }
+.tl-card h4 { margin: 8px 0 0; font-size: 17px; font-weight: 500; }
+.tl-round { display: grid; grid-template-columns: 80px 1fr 36px; gap: 8px; padding: 12px 10px; border-radius: 10px; font-size: 14px; }
+.tl-round.active { background: #15284a; box-shadow: inset 3px 0 0 var(--accent); }
+.tl-emo { color: var(--c); display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 4px; }
+.tl-rounds { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 8px; }
+.tl-other { display: flex; justify-content: space-between; align-items: center; padding: 14px 4px; border-top: 1px solid var(--line); text-decoration: none; color: var(--text); }
+.tl-other small { display: block; color: var(--muted); }
+
+/* Charts */
+.chart { width: 100%; height: auto; }
+.chart .axis { stroke: #24324f; }
+.chart .grid { stroke: #1c2a44; stroke-dasharray: 4 4; }
+.chart text { fill: var(--muted); font-size: 12px; }
+.chart .val { fill: var(--text); font-size: 11px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.stat .v { font-size: 24px; font-weight: 500; }
+.stat .k { color: var(--muted); font-size: 13px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.note { color: var(--muted); font-size: 13px; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a2b4d; border: 1px solid #23375e; padding: 10px 18px; border-radius: 10px; font-size: 14px; z-index: 10; }
+
+@media (max-width: 1280px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .timeline { display: none; } }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sidebar-foot { display: none; }
+  .hero, .row, .spectrum, .stats { grid-template-columns: 1fr; }
+  .hero > div + div { border-left: 0; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+  .main { padding: 20px; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <span style="height:10px"></span><span style="height:22px"></span><span style="height:32px"></span><span style="height:22px"></span><span style="height:10px"></span>
+    </div>
+    <div>
+      <h1>Inner Speech Receptor</h1>
+      <p>See your thoughts. Understand your patterns.</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="listen-pill" class="pill"><span class="dot"></span><span id="listen-text">Listening is OFF</span></span>
+    <span id="clock"></span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar" id="nav">
+    <a href="#/home" data-route="home">Home</a>
+    <a href="#/spectrum" data-route="spectrum">Emotion Spectrum</a>
+    <a href="#/story" data-route="story">Story</a>
+    <a href="#/voice" data-route="voice">Voice Graph</a>
+    <a href="#/pause" data-route="pause">Pause Graph</a>
+    <a href="#/history" data-route="history">History</a>
+    <a href="#/settings" data-route="settings">Settings</a>
+    <div class="sidebar-foot"><strong>Observe &amp; Reflect</strong><span>Not judge.</span></div>
+  </nav>
+  <main id="view" class="main"></main>
+  <aside id="timeline" class="timeline"></aside>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   1. UTILS
+   ========================================================= */
+const THAI = /[\u0E00-\u0E7F]/;
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\ CODEBLOCK0 ');
+const normalize = (s = '') => s.toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+
+function containsTerm(text, term) {
+  if (THAI.test(term)) return text.includes(term);
+  return new RegExp(`(^|[^a-z0-9'])${escRe(term)}(?=$|[^a-z0-9])`).test(text);
+}
+const countWords = (text) =>
+  THAI.test(text) ? Math.max(1, Math.round(text.replace(/\s/g, '').length / 4))
+                  : text.split(/\s+/).filter(Boolean).length;
+const escapeHtml = (s = '') =>
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const h = escapeHtml;
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDuration(sec) {
+  if (sec < 60) return `${sec.toFixed(1)}s`;
+  return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+}
+const pad2 = (n) => String(n).padStart(2, '0');
+const truncate = (s, n = 80) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/* =========================================================
+   2. EMOTION DETECTOR  (names + colors only, never good/bad)
+   ========================================================= */
+const EMOTION_COLORS = {
+  Anger: '#ff4d6d', Sadness: '#3b82f6', Anxiety: '#8b5cf6',
+  Frustration: '#f5a524', Hurt: '#14b8a6', Others: '#64748b',
+};
+const EMOTION_ORDER = ['Anger', 'Sadness', 'Anxiety', 'Frustration', 'Hurt', 'Others'];
+
+const LEXICON = {
+  Anger: ['angry', 'anger', 'mad', 'furious', 'pissed', 'hate', 'rage', 'โกรธ', 'โมโห', 'แค้น'],
+  Sadness: ['sad', 'cry', 'crying', 'lonely', 'empty', 'hopeless', 'heartbroken', 'เศร้า', 'เสียใจ', 'เหงา', 'ร้องไห้'],
+  Anxiety: ['worried', 'worry', 'anxious', 'nervous', 'scared', 'afraid', 'stress', 'stressed', 'doubt', 'not good enough', 'กังวล', 'กลัว', 'เครียด', 'ไม่มั่นใจ'],
+  Frustration: ['frustrating', 'frustrated', 'stuck', 'fed up', 'tired of', 'keep coming back', 'again and again', 'หงุดหงิด', 'เบื่อ', 'ติดอยู่'],
+  Hurt: ['hurt', 'hurts', 'betrayed', 'let down', 'disappointed', 'ignored', 'เจ็บ', 'น้อยใจ', 'ผิดหวัง'],
+};
+const INTENSIFIERS = ['very', 'so', 'really', 'extremely', 'totally', "can't stop", 'always', 'never', 'มาก', 'สุดๆ', 'จริงๆ', 'ที่สุด'];
+const levelOf = (score) => (score >= 0.7 ? 'High' : score >= 0.4 ? 'Medium' : 'Low');
+
+function detectEmotion(raw) {
+  const text = normalize(raw);
+  const ranked = Object.entries(LEXICON)
+    .map(([label, terms]) => [label, terms.filter((t) => containsTerm(text, t)).length])
+    .filter(([, hits]) => hits > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (!ranked.length) return { label: 'Others', score: 0.3, level: 'Low' };
+  const [label, hits] = ranked[0];
+  const boosts = INTENSIFIERS.filter((w) => containsTerm(text, w)).length;
+  const exclaims = Math.min((raw.match(/!/g) || []).length, 3);
+  let score = 0.45 + 0.1 * (hits - 1) + 0.12 * boosts + 0.05 * exclaims;
+  score = Math.min(1, Math.round(score * 10) / 10);
+  return { label, score, level: levelOf(score) };
+}
+
+/* =========================================================
+   3. STORY DETECTOR  (semantic grouping via concept map)
+   ========================================================= */
+const CONCEPTS = {
+  family: { label: 'Family', terms: ['brother', 'sister', 'sibling', 'mom', 'mother', 'dad', 'father', 'parents', 'family', 'son', 'daughter', 'พี่ชาย', 'น้องชาย', 'พี่สาว', 'น้องสาว', 'แม่', 'พ่อ', 'ครอบครัว'] },
+  work: { label: 'Work', terms: ['work', 'job', 'boss', 'office', 'career', 'deadline', 'interview', 'project', 'colleague', 'meeting', 'งาน', 'เจ้านาย', 'ออฟฟิศ', 'ที่ทำงาน', 'สัมภาษณ์'] },
+  future: { label: 'Future', terms: ['future', 'next week', 'next year', 'plan', 'plans', 'someday', 'อนาคต', 'ปีหน้า', 'แผน'] },
+  self: { label: 'Self', terms: ['doubt', 'myself', 'good enough', 'confidence', 'who i am', 'ตัวเอง', 'ไม่ดีพอ', 'ไม่เก่ง'] },
+  relationship: { label: 'Relationship', terms: ['girlfriend', 'boyfriend', 'partner', 'wife', 'husband', 'relationship', 'breakup', 'แฟน', 'คนรัก', 'เลิกกัน'] },
+  friends: { label: 'Friends', terms: ['friend', 'friends', 'เพื่อน'] },
+  health: { label: 'Health', terms: ['health', 'sick', 'sleep', 'body', 'doctor', 'สุขภาพ', 'ป่วย', 'นอนไม่หลับ'] },
+  money: { label: 'Money', terms: ['money', 'debt', 'rent', 'salary', 'bills', 'เงิน', 'หนี้', 'ค่าเช่า', 'เงินเดือน'] },
+};
+const STOP = new Set(("i me my myself we our you your he she it they them a an the and or but so to of in on at for with about what that this " +
+  "is am are was were be been have has had do does did not no just really very can can't don't i'm it's feel feeling think thinking " +
+  "keep still again there here then than when how why who which would could should will maybe like get got going now honestly").split(' '));
+const stem = (w) => (w.length > 4 ? w.replace(/(ing|ed|es|s)$/, '') : w);
+const tokenize = (t) => new Set(t.split(/[^a-z0-9'\u0E00-\u0E7F]+/).filter((w) => w.length > 2 && !STOP.has(w)).map(stem));
+const overlap = (a, b) => {
+  if (!a.size || !b.size) return 0;
+  let n = 0; a.forEach((x) => { if (b.has(x)) n++; });
+  return n / Math.min(a.size, b.size);
+};
+
+class StoryDetector {
+  constructor({ threshold = 0.5 } = {}) { this.threshold = threshold; this.stories = []; }
+  get(id) { return this.stories.find((s) => s.id === id); }
+
+  features(raw) {
+    const text = normalize(raw);
+    const concepts = new Set(); const terms = [];
+    for (const [key, c] of Object.entries(CONCEPTS)) {
+      for (const term of c.terms) if (containsTerm(text, term)) { concepts.add(key); terms.push(term); }
+    }
+    return { concepts, terms, tokens: tokenize(text) };
+  }
+
+  similarity(f, story) {
+    const tokenSim = overlap(f.tokens, story.tokens);
+    if (!f.concepts.size) return f.tokens.size >= 3 ? tokenSim : 0;
+    if (!story.concepts.size) return tokenSim;
+    return 0.75 * overlap(f.concepts, story.concepts) + 0.25 * tokenSim;
+  }
+
+  assign(text, lastStoryId) {
+    const f = this.features(text);
+    let best = null, bestScore = 0;
+    for (const s of this.stories) {
+      const score = this.similarity(f, s);
+      if (score > bestScore) { best = s; bestScore = score; }
+    }
+    if (best && bestScore >= this.threshold) return this.absorb(best, f);
+    if (!f.concepts.size && f.tokens.size < 4 && lastStoryId) return this.absorb(this.get(lastStoryId), f);
+    return this.absorb(this.create(), f);
+  }
+
+  create() {
+    const n = this.stories.length + 1;
+    const story = { id: `s${n}`, number: n, code: `#${pad2(n)}`, label: 'Untitled', concepts: new Set(), conceptCounts: {}, termCounts: {}, tokens: new Set(), rounds: [] };
+    this.stories.push(story);
+    return story;
+  }
+
+  absorb(story, f) {
+    f.concepts.forEach((c) => { story.concepts.add(c); story.conceptCounts[c] = (story.conceptCounts[c] || 0) + 1; });
+    f.terms.forEach((t) => { story.termCounts[t] = (story.termCounts[t] || 0) + 1; });
+    f.tokens.forEach((t) => story.tokens.add(t));
+    story.label = storyLabel(story);
+    return story;
+  }
+}
+
+function storyLabel(story) {
+  const concepts = Object.entries(story.conceptCounts).sort((a, b) => b[1] - a[1]).map(([k]) => CONCEPTS[k].label);
+  if (concepts.length >= 2) return `${concepts[0]} / ${concepts[1]}`;
+  if (concepts.length === 1) {
+    const term = Object.entries(story.termCounts).sort((a, b) => b[1] - a[1]).map(([t]) => t)
+      .find((t) => t !== concepts[0].toLowerCase());
+    return term ? `${concepts[0]} / ${cap(term)}` : concepts[0];
+  }
+  const words = [...story.tokens].slice(0, 2).map(cap);
+  return words.length ? `Untitled / ${words.join(' ')}` : 'Untitled';
+}
+
+/* =========================================================
+   4. SESSION ENGINE  (Story -> Emotion -> Round)
+   New round ONLY when a story returns after other content.
+   ========================================================= */
+class SessionEngine {
+  constructor({ threshold = 0.5 } = {}) { this.listeners = new Set(); this.threshold = threshold; this.reset(); }
+  subscribe(fn) { this.listeners.add(fn); }
+  emit() { this.listeners.forEach((fn) => fn(this)); }
+
+  reset() {
+    this.detector = new StoryDetector({ threshold: this.threshold });
+    this.segments = []; this.rounds = []; this.lastStoryId = null;
+    this.emit();
+  }
+  setThreshold(v) { this.threshold = v; this.detector.threshold = v; }
+  get stories() { return this.detector.stories; }
+  story(id) { return this.detector.get(id); }
+
+  addSegment({ text, start, end }) {
+    text = (text || '').trim();
+    if (!text) return;
+    const prev = this.segments.at(-1);
+    const story = this.detector.assign(text, this.lastStoryId);   // 1. Story
+    const emotion = detectEmotion(text);                         // 2. Emotion
+    const sameTurn = story.id === this.lastStoryId;              // 3. Round
+
+    let round;
+    if (sameTurn) {
+      round = story.rounds.at(-1);
+      round.end = end; round.text += ' ' + text; round.quote = text;
+      round.emotion = detectEmotion(round.text);
+    } else {
+      round = { id: `r${this.rounds.length + 1}`, storyId: story.id, number: story.rounds.length + 1, start, end, text, quote: text, emotion };
+      story.rounds.push(round); this.rounds.push(round);
+    }
+
+    const minutes = Math.max((end - start) / 60000, 1 / 60);
+    this.segments.push({
+      id: `g${this.segments.length + 1}`, text, start, end,
+      storyId: story.id, roundNumber: round.number, newRound: !sameTurn, emotion,
+      wpm: Math.round(countWords(text) / minutes),
+      pauseBefore: prev ? Math.max(0, (start - prev.end) / 1000) : null,
+    });
+    this.lastStoryId = story.id;
+    this.emit();
+  }
+
+  current() {
+    const seg = this.segments.at(-1);
+    if (!seg) return null;
+    const story = this.story(seg.storyId);
+    return { story, round: story.rounds.at(-1), segment: seg };
+  }
+
+  spectrum() {
+    const totals = Object.fromEntries(EMOTION_ORDER.map((k) => [k, 0]));
+    let sum = 0;
+    for (const s of this.segments) { const w = Math.max(s.emotion.score, 0.1); totals[s.emotion.label] += w; sum += w; }
+    return Object.fromEntries(EMOTION_ORDER.map((k) => [k, sum ? Math.round((totals[k] / sum) * 100) : 0]));
+  }
+
+  storiesByRecent() { return [...this.stories].sort((a, b) => b.rounds.at(-1).end - a.rounds.at(-1).end); }
+
+  toJSON() {
+    const iso = (t) => new Date(t).toISOString();
+    return {
+      exportedAt: new Date().toISOString(),
+      stories: this.stories.map((s) => ({
+        id: s.code, label: s.label, concepts: [...s.concepts],
+        rounds: s.rounds.map((r) => ({ round: r.number, start: iso(r.start), end: iso(r.end), emotion: r.emotion, text: r.text })),
+      })),
+      segments: this.segments.map((g) => ({ ...g, start: iso(g.start), end: iso(g.end) })),
+    };
+  }
+}
+
+/* =========================================================
+   5. MOCK DATA  (timestamps relative to now, never in future)
+   ========================================================= */
+const DEMO_SCRIPT = [
+  [38, 'I feel hurt about what happened with my brother.'],
+  [33, "I'm worried about my job and where my future is going."],
+  [26, "I keep coming back to this, my brother never listens. It's really frustrating."],
+  [20, "Maybe I'm just not good enough. I doubt myself."],
+  [12, "It's still on my mind, I can't stop thinking about my brother. I'm so angry."],
+  [7, 'The job interview next week makes me nervous.'],
+  [2, 'Honestly I just feel sad about my brother and our family now.'],
+];
+function loadDemo(engine) {
+  const now = Date.now();
+  for (const [minAgo, text] of DEMO_SCRIPT) {
+    const start = now - minAgo * 60000;
+    engine.addSegment({ text, start, end: start + text.split(/\s+/).length * 420 });
+  }
+}
+
+/* =========================================================
+   6. SPEECH INPUT  (Web Speech API, timestamps per segment)
+   ========================================================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+class SpeechInput {
+  constructor({ lang = 'en-US', onSegment, onInterim, onStateChange, onError } = {}) {
+    Object.assign(this, { lang, onSegment, onInterim, onStateChange, onError });
+    this.listening = false; this.rec = null; this.segStart = null;
+  }
+  static get supported() { return Boolean(SR); }
+
+  start() {
+    if (!SR) { this.onError?.('Speech recognition is not supported in this browser. Please use Chrome or Edge.'); return; }
+    if (this.listening) return;
+    const rec = new SR();
+    rec.lang = this.lang; rec.continuous = true; rec.interimResults = true;
+
+    rec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (this.segStart === null) this.segStart = Date.now();
+        if (r.isFinal) {
+          const text = r[0].transcript.trim();
+          if (text) this.onSegment?.({ text, start: this.segStart, end: Date.now() });
+          this.segStart = null; this.onInterim?.('');
+        } else {
+          this.onInterim?.(r[0].transcript);
+        }
+      }
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { this.stop(); this.onError?.('Microphone permission was denied.'); }
+      else if (e.error !== 'no-speech' && e.error !== 'aborted') this.onError?.(`Speech error: ${e.error}`);
+    };
+    rec.onend = () => { if (this.listening) { try { rec.start(); } catch (_) {} } };
+
+    this.rec = rec; this.listening = true;
+    rec.start();
+    this.onStateChange?.(true);
+  }
+  stop() {
+    this.listening = false; this.rec?.stop(); this.rec = null; this.segStart = null;
+    this.onStateChange?.(false);
+  }
+  setLang(lang) { this.lang = lang; if (this.listening) { this.stop(); this.start(); } }
+}
+
+/* =========================================================
+   7. VIEWS
+   ========================================================= */
+const NO_DATA = 'Nothing captured yet. Turn on the microphone, type a test sentence, or load demo data in Settings.';
+const color = (label) => EMOTION_COLORS[label] || EMOTION_COLORS.Others;
+const tag = (em, text = em.label) => `<span class="tag" style="--c:${color(em.label)}">${h(text)}</span>`;
+const empty = (msg = NO_DATA) => `<div class="empty">${msg}</div>`;
+const MIC_SVG = `<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
+
+function greeting(name) {
+  const hr = new Date().getHours();
+  return `${hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening'}, ${h(name)}`;
+}
+function intensityBar(score) {
+  const n = 6, filled = Math.round(score * n);
+  return `<div class="ibar">${Array.from({ length: n }, (_, i) => `<span class="${i < filled ? 'on' : ''}"></span>`).join('')}</div>`;
+}
+function emotionPath(story) {
+  return `<div class="path">${story.rounds.map((r, i) =>
+    `${i ? '<span class="arrow">→</span>' : ''}<span class="step" style="--c:${color(r.emotion.label)}"><i class="dot"></i>${r.emotion.label}</span>`).join('')}</div>`;
+}
+const pattern = (s) => (s.rounds.length === 1 ? 'Mentioned once' : `Repeated ${s.rounds.length} rounds`);
+const durationMin = (s) => Math.max(1, Math.round((s.rounds.at(-1).end - s.rounds[0].start) / 60000));
+const roundsChip = (n) => `${n} round${n > 1 ? 's' : ''}`;
+
+function ring(em) {
+  const r = 70, c = 2 * Math.PI * r, len = c * Math.max(em.score, 0.05);
+  return `<svg class="ring" viewBox="0 0 180 180" style="--c:${color(em.label)}">
+    <circle cx="90" cy="90" r="${r}" class="ring-bg"/>
+    <circle cx="90" cy="90" r="${r}" class="ring-fg" stroke-dasharray="${len} ${c}" transform="rotate(-90 90 90)"/>
+    <text x="90" y="62" class="ring-sm">Current</text>
+    <text x="90" y="80" class="ring-sm">Emotion</text>
+    <text x="90" y="110" class="ring-lg">${em.label}</text>
+    <text x="90" y="134" class="ring-lvl">${em.level}</text>
+  </svg>`;
+}
+function spectrumBars(spec) {
+  return EMOTION_ORDER.map((k) => `<div class="sbar"><span>${k}</span>
+    <div class="track"><div class="fill" style="width:${spec[k]}%;background:${color(k)}"></div></div>
+    <span class="pct">${spec[k]}%</span></div>`).join('');
+}
+function spectrumCard(e) {
+  const cur = e.current();
+  return `<section class="card">
+    <div class="card-head"><h3>Emotion Spectrum</h3><p>Overall emotional landscape (current session)</p></div>
+    ${cur ? `<div class="spectrum"><div>${spectrumBars(e.spectrum())}</div>${ring(cur.round.emotion)}</div>` : empty()}
+  </section>`;
+}
+function micCard(ui) {
+  return `<section class="card mic-card">
+    <button class="mic-btn ${ui.listening ? 'on' : ''}" data-action="toggle-mic" aria-label="Toggle microphone">${MIC_SVG}</button>
+    <div>Microphone</div>
+    <div class="mic-state">${ui.listening ? 'ON' : 'OFF'}</div>
+    <button class="btn ghost" data-action="toggle-mic">${ui.listening ? 'Microphone OFF' : 'Microphone ON'}</button>
+    <p id="interim" class="interim">${ui.supported ? '' : 'Speech input needs Chrome or Edge.'}</p>
+  </section>`;
+}
+function testInputCard() {
+  return `<section class="card">
+    <div class="card-head"><h3>Test input</h3><p>Type a sentence to simulate speech (for testing without a microphone)</p></div>
+    <form class="test-input" id="test-form">
+      <input type="text" id="test-text" placeholder="e.g. I can't stop thinking about my brother..." autocomplete="off"/>
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </section>`;
+}
+function roundRows(e, rounds) {
+  return rounds.map((r) => {
+    const s = e.story(r.storyId);
+    return `<tr>
+      <td class="muted">${fmtTime(r.start)}</td>
+      <td class="muted">Story ${s.code}<span class="sep">|</span>Round ${r.number}</td>
+      <td>"${h(truncate(r.quote, 70))}"</td>
+      <td>${tag(r.emotion)}</td>
+      <td class="num">${r.emotion.score.toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* Charts */
+function barChart(items, fmt) {
+  if (!items.length) return empty();
+  const W = 800, H = 240, P = 34;
+  const max = Math.max(...items.map((i) => i.value), 1);
+  const bw = (W - P * 2) / items.length;
+  const bars = items.map((it, i) => {
+    const bh = (it.value / max) * (H - P * 2);
+    const x = P + i * bw + bw * 0.15, y = H - P - bh, cx = x + bw * 0.35;
+    return `<g><rect x="${x}" y="${y}" width="${bw * 0.7}" height="${bh}" rx="4" fill="${it.color}"><title>${h(it.title)}</title></rect>
+      <text x="${cx}" y="${y - 6}" text-anchor="middle" class="val">${fmt(it.value)}</text>
+      <text x="${cx}" y="${H - P + 18}" text-anchor="middle">${h(it.label)}</text></g>`;
+  }).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}"><line class="axis" x1="${P}" y1="${H - P}" x2="${W - P}" y2="${H - P}"/>${bars}</svg>`;
+}
+function trendChart(segs) {
+  if (segs.length < 2) return empty('At least two segments are needed to show a trend.');
+  const W = 800, H = 260, P = 56, t0 = segs[0].start, span = segs.at(-1).start - t0 || 1;
+  const x = (s) => P + ((s.start - t0) / span) * (W - P * 2);
+  const y = (v) => H - 34 - v * (H - 68);
+  const line = segs.map((s) => `${x(s).toFixed(1)},${y(s.emotion.score).toFixed(1)}`).join(' ');
+  const grid = [0.4, 0.7].map((v) => `<line class="grid" x1="${P}" x2="${W - 20}" y1="${y(v)}" y2="${y(v)}"/>`).join('');
+  const labels = [['High', 0.85], ['Medium', 0.55], ['Low', 0.2]].map(([t, v]) => `<text x="8" y="${y(v) + 4}">${t}</text>`).join('');
+  const dots = segs.map((s) => `<circle cx="${x(s)}" cy="${y(s.emotion.score)}" r="6" fill="${color(s.emotion.label)}"><title>${fmtTime(s.start)} · ${s.emotion.label} ${s.emotion.score.toFixed(1)}</title></circle>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${grid}${labels}
+    <polyline points="${line}" fill="none" stroke="#3a4a6b" stroke-width="2"/>${dots}
+    <text x="${P}" y="${H - 8}">${fmtTime(segs[0].start)}</text>
+    <text x="${W - 20}" y="${H - 8}" text-anchor="end">${fmtTime(segs.at(-1).start)}</text></svg>`;
+}
+const legend = () => `<div class="legend">${EMOTION_ORDER.map((k) => `<span><i class="dot" style="--c:${color(k)}"></i>${k}</span>`).join('')}</div>`;
+const stat = (v, k) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+
+/* Pages */
+function homeView(e, ui) {
+  const cur = e.current();
+  const hero = cur
+    ? `<section class="card hero">
+        <div><div class="card-label">Current Story</div><h3>${h(cur.story.label)}</h3><p class="quote">"${h(truncate(cur.round.quote, 110))}"</p></div>
+        <div><div class="card-label muted">Round</div><div class="big">Round ${cur.round.number}</div><div class="muted">(of ${cur.story.rounds.length})</div></div>
+        <div style="--c:${color(cur.round.emotion.label)}"><div class="card-label muted">Emotion</div><div class="big">${cur.round.emotion.label}</div><span class="tag">${cur.round.emotion.level}</span>${intensityBar(cur.round.emotion.score)}</div>
+      </section>`
+    : `<section class="card">${empty()}</section>`;
+  const recent = [...e.rounds].sort((a, b) => b.start - a.start).slice(0, 5);
+  return `
+    <section><h2 class="title">${greeting(ui.name)}</h2><p class="subtitle">Let's take a closer look at what's on your mind.</p></section>
+    ${hero}
+    <div class="row">${spectrumCard(e)}${micCard(ui)}</div>
+    ${testInputCard()}
+    <section class="card">
+      <div class="card-head"><h3>Recent Activity</h3><p>Latest speech and emotion analysis</p></div>
+      ${recent.length ? `<table>${roundRows(e, recent)}</table><a class="link" href="#/history">View Full History →</a>` : empty()}
+    </section>`;
+}
+
+function spectrumView(e) {
+  return `
+    <section><h2 class="title">Emotion Spectrum</h2><p class="subtitle">Where emotions sit and how they move over time.</p></section>
+    ${spectrumCard(e)}
+    <section class="card">
+      <div class="card-head"><h3>Trend</h3><p>Intensity of each segment over time, colored by emotion</p></div>
+      ${trendChart(e.segments)}${legend()}
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Emotion path per story</h3><p>How the emotion shifted each time a story came back</p></div>
+      ${e.stories.length ? e.stories.map((s) => `<div><strong>Story ${s.code}</strong> <span class="muted">${h(s.label)}</span>${emotionPath(s)}</div>`).join('') : empty()}
+    </section>
+    <p class="note">Emotions are shown by name, color and intensity only. No emotion is treated as better or worse than another.</p>`;
+}
+
+function storyView(e) {
+  const stories = e.storiesByRecent();
+  return `
+    <section><h2 class="title">Stories</h2><p class="subtitle">Each story is a theme you came back to. A new round starts only when a story returns after other topics.</p></section>
+    ${stories.length ? stories.map((s) => `
+      <section class="card">
+        <div class="tl-top"><span class="muted">Story ${s.code}</span><span class="chip">${roundsChip(s.rounds.length)}</span></div>
+        <h3 style="margin-top:6px">${h(s.label)}</h3>
+        ${emotionPath(s)}
+        <div class="meta"><span>Duration: ${durationMin(s)} minutes</span><span>Pattern: ${pattern(s)}</span></div>
+        <table><tr><th>Time</th><th>Round</th><th>What was said</th><th>Emotion</th><th class="num">Score</th></tr>
+        ${s.rounds.map((r) => `<tr><td class="muted">${fmtTime(r.start)}</td><td>Round ${r.number}</td><td>"${h(truncate(r.text, 90))}"</td><td>${tag(r.emotion)}</td><td class="num">${r.emotion.score.toFixed(1)}</td></tr>`).join('')}
+        </table>
+      </section>`).join('') : `<section class="card">${empty()}</section>`}`;
+}
+
+function voiceView(e) {
+  const segs = e.segments;
+  const avg = segs.length ? Math.round(segs.reduce((a, s) => a + s.wpm, 0) / segs.length) : 0;
+  const total = segs.reduce((a, s) => a + (s.end - s.start) / 1000, 0);
+  return `
+    <section><h2 class="title">Voice Graph</h2><p class="subtitle">Speaking pace per segment (words per minute).</p></section>
+    <section class="card stats">${stat(segs.length, 'Segments')}${stat(avg, 'Average pace (wpm)')}${stat(fmtDuration(total), 'Total speaking time')}</section>
+    <section class="card">
+      <div class="card-head"><h3>Pace over time</h3><p>Bar color follows the emotion of each segment</p></div>
+      ${barChart(segs.map((s) => ({ value: s.wpm, label: fmtTime(s.start), color: color(s.emotion.label), title: s.text })), (v) => v)}
+      ${legend()}
+    </section>
+    <p class="note">Descriptive only. The voice is never classified as normal or abnormal, and nothing here is a diagnosis.</p>`;
+}
+
+function pauseView(e) {
+  const segs = e.segments.filter((s) => s.pauseBefore !== null);
+  const pauses = segs.map((s) => s.pauseBefore);
+  const avg = pauses.length ? pauses.reduce((a, b) => a + b, 0) / pauses.length : 0;
+  return `
+    <section><h2 class="title">Pause Graph</h2><p class="subtitle">Silence before each segment.</p></section>
+    <section class="card stats">${stat(pauses.length, 'Pauses measured')}${stat(fmtDuration(avg), 'Average pause')}${stat(fmtDuration(Math.max(0, ...pauses)), 'Longest pause')}</section>
+    <section class="card">
+      <div class="card-head"><h3>Pauses over time</h3><p>Highlighted bars mark a pause before a story shift (new round)</p></div>
+      ${barChart(segs.map((s) => ({ value: s.pauseBefore, label: fmtTime(s.start), color: s.newRound ? '#4f8cff' : '#334155', title: s.text })), fmtDuration)}
+      <div class="legend"><span><i class="dot" style="--c:#4f8cff"></i>Before a story shift</span><span><i class="dot" style="--c:#334155"></i>Within the same round</span></div>
+    </section>`;
+}
+
+function historyView(e, ui) {
+  const segs = [...e.segments].reverse().filter((s) => ui.filter === 'all' || s.storyId === ui.filter);
+  const options = [`<option value="all">All stories</option>`, ...e.stories.map((s) =>
+    `<option value="${s.id}" ${ui.filter === s.id ? 'selected' : ''}>Story ${s.code} · ${h(s.label)}</option>`)].join('');
+  return `
+    <section><h2 class="title">History</h2><p class="subtitle">Every captured segment in this session.</p></section>
+    <section class="card">
+      <div class="toolbar"><select id="story-filter">${options}</select><button class="btn ghost" data-action="export">Export JSON</button></div>
+      ${segs.length ? `<table><tr><th>Time</th><th>Story / Round</th><th>Text</th><th>Emotion</th><th class="num">Score</th></tr>
+        ${segs.map((s) => `<tr><td class="muted">${fmtTime(s.start)}</td><td class="muted">Story ${e.story(s.storyId).code}<span class="sep">|</span>Round ${s.roundNumber}</td><td>${h(s.text)}</td><td>${tag(s.emotion)}</td><td class="num">${s.emotion.score.toFixed(1)}</td></tr>`).join('')}
+      </table>` : empty()}
+    </section>`;
+}
+
+function settingsView(_e, ui) {
+  const langs = [['en-US', 'English (US)'], ['th-TH', 'Thai (ภาษาไทย)']];
+  return `
+    <section><h2 class="title">Settings</h2></section>
+    <section class="card form">
+      <label>Your name<input type="text" id="set-name" value="${h(ui.name)}"/></label>
+      <label>Speech language<select id="set-lang">${langs.map(([v, l]) => `<option value="${v}" ${ui.lang === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Story grouping strictness: <span id="thr-val">${ui.threshold}</span>
+        <input type="range" id="set-threshold" min="0.3" max="0.8" step="0.05" value="${ui.threshold}"/>
+        <small>Lower groups more loosely, higher is stricter. Applies to new speech.</small></label>
+      <label class="check"><input type="checkbox" id="set-demo" ${ui.demo ? 'checked' : ''}/> Load demo data on start</label>
+    </section>
+    <section class="card actions">
+      <button class="btn" data-action="load-demo">Load demo data</button>
+      <button class="btn ghost" data-action="export">Export session (JSON)</button>
+      <button class="btn subtle" data-action="reset">Clear session</button>
+    </section>
+    <p class="note">Analysis runs in your browser. The browser's built-in speech recognition (Chrome/Edge) may send audio to the browser vendor's service for transcription.</p>`;
+}
+
+function timelineView(e) {
+  const head = `<div class="tl-head"><h3>Story Timeline</h3><p>See how the story unfolds and emotions change</p></div>`;
+  const stories = e.storiesByRecent();
+  if (!stories.length) return head + empty('Stories will appear here as you speak.');
+  const [cur, ...rest] = stories;
+  const activeId = e.current()?.round.id;
+  const rounds = cur.rounds.map((r) => `
+    <div class="tl-round ${r.id === activeId ? 'active' : ''}">
+      <span class="muted">${fmtTime(r.start)}</span>
+      <div><div>Round ${r.number}</div><div class="tl-emo" style="--c:${color(r.emotion.label)}"><i class="dot"></i>${r.emotion.label}</div></div>
+      <span class="num">${r.emotion.score.toFixed(1)}</span>
+    </div>`).join('');
+  const others = rest.map((s) => `
+    <a class="tl-other" href="#/story"><div>Story ${s.code}<small>${h(s.label)}</small></div><span class="chip">${roundsChip(s.rounds.length)} ›</span></a>`).join('');
+  return `${head}
+    <div class="tl-card">
+      <div class="tl-top"><span>Story ${cur.code}</span><span class="chip">${roundsChip(cur.rounds.length)}</span></div>
+      <h4>${h(cur.label)}</h4>
+      ${emotionPath(cur)}
+      <div class="meta"><span>Duration: ${durationMin(cur)} minutes</span><span>Pattern: ${pattern(cur)}</span></div>
+      <div class="tl-rounds">${rounds}</div>
+      ${others}
+    </div>`;
+}
+
+/* =========================================================
+   8. APP  (routing, state, events)
+   ========================================================= */
+const STORAGE_KEY = 'isr.settings';
+const DEFAULTS = { name: 'Joe', lang: 'en-US', threshold: 0.5, demo: true };
+function safeParse(s) { try { return JSON.parse(s) || {}; } catch (_) { return {}; } }
+function loadSettings() { try { return safeParse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return {}; } }
+function saveSettings() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch (_) {} }
+
+const settings = { ...DEFAULTS, ...loadSettings() };
+const ui = { listening: false, filter: 'all', supported: SpeechInput.supported };
+const engine = new SessionEngine({ threshold: settings.threshold });
+
+const speech = new SpeechInput({
+  lang: settings.lang,
+  onSegment: (seg) => engine.addSegment(seg),
+  onInterim: (text) => { const el = document.getElementById('interim'); if (el) el.textContent = text; },
+  onStateChange: (on) => { ui.listening = on; render(); },
+  onError: (msg) => toast(msg),
+});
+
+const ROUTES = {
+  home: homeView, spectrum: spectrumView, story: storyView,
+  voice: voiceView, pause: pauseView, history: historyView, settings: settingsView,
+};
+function currentRoute() {
+  const r = location.hash.replace(/^#\/?/, '');
+  return ROUTES[r] ? r : 'home';
+}
+
+function render() {
+  const route = currentRoute();
+  const ctx = { ...settings, ...ui };
+  document.getElementById('view').innerHTML = ROUTES[route](engine, ctx);
+  document.getElementById('timeline').innerHTML = timelineView(engine);
+  document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === route));
+  document.getElementById('listen-pill').classList.toggle('on', ui.listening);
+  document.getElementById('listen-text').textContent = `Listening is ${ui.listening ? 'ON' : 'OFF'}`;
+}
+
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-action]');
+  if (!el) return;
+  switch (el.dataset.action) {
+    case 'toggle-mic': ui.listening ? speech.stop() : speech.start(); break;
+    case 'load-demo': engine.reset(); loadDemo(engine); toast('Demo data loaded.'); break;
+    case 'reset': if (confirm('Clear all stories and segments from this session?')) { engine.reset(); toast('Session cleared.'); } break;
+    case 'export': exportJSON(); break;
+  }
+});
+
+document.addEventListener('submit', (ev) => {
+  if (ev.target.id !== 'test-form') return;
+  ev.preventDefault();
+  const input = document.getElementById('test-text');
+  const text = input.value.trim();
+  if (!text) return;
+  const end = Date.now();
+  engine.addSegment({ text, start: end - Math.max(1500, countWords(text) * 400), end });
+  const again = document.getElementById('test-text');
+  if (again) again.focus();
+});
+
+document.addEventListener('change', (ev) => {
+  const { id, value, checked } = ev.target;
+  if (!id) return;
+  if (id === 'story-filter') { ui.filter = value; render(); return; }
+  if (id === 'set-name') settings.name = value.trim() || DEFAULTS.name;
+  if (id === 'set-lang') { settings.lang = value; speech.setLang(value); }
+  if (id === 'set-threshold') { settings.threshold = Number(value); engine.setThreshold(settings.threshold); }
+  if (id === 'set-demo') settings.demo = checked;
+  if (id.startsWith('set-')) { saveSettings(); toast('Settings saved.'); }
+});
+
+document.addEventListener('input', (ev) => {
+  if (ev.target.id === 'set-threshold') document.getElementById('thr-val').textContent = ev.target.value;
+});
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(engine.toJSON(), null, 2)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `inner-speech-${new Date().toISOString().slice(0, 10)}.json`,
+  });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
+
+function tick() {
+  const now = Date.now();
+  document.getElementById('clock').textContent = `${fmtDate(now)}   ${fmtTime(now)}`;
+}
+
+/* Boot */
+if (settings.demo) loadDemo(engine);
+engine.subscribe(render);
+window.addEventListener('hashchange', render);
+render();
+tick();
+setInterval(tick, 15000);
+</script>
+</body>
+</html>
